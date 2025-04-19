@@ -103,8 +103,11 @@ ISODATE=$(date --iso-8601=date --date="${STATUS_LASTMODIFIED}")
 echo "ISODATE: ${ISODATE}"
 
 TARGET_FILE_NAME="${TLDZONE}_${ISODATE}.txt.gz"
-TARGET_PATH_FILE="${TARGET_PATH_FILE}/${TLDZONE}_${ISODATE}.txt.gz"
+TARGET_PATH_FILE="${TARGET_PATH}/${TLDZONE}_${ISODATE}.txt.gz"
 
+#===========================================================
+# PROBE
+#===========================================================
 if [[ -f "${TARGET_PATH_FILE}" ]]
 then
     echo "EXISTS: ${TARGET_FILE_NAME}"
@@ -226,7 +229,6 @@ do
             then
                 START="${LABEL_TO_START[${LABEL_WAIT}]}"
                 END="${LABEL_TO_END[${LABEL_WAIT}]}"
-                LABEL_LOG_PATH_FILE="${TARGET_PATH}/${LABEL_WAIT}.log.txt"
                 curl \
                     --no-progress-meter \
                     --retry "${CURLRETRY}" \
@@ -272,7 +274,14 @@ fi
 
 # Assemble.
 echo "BEGIN: ASSEMBLE..."
-cat "${LABEL_TO_PATH_FILE[@]}" > "${TARGET_FILE_NAME}"
+declare -a ORDERED_LABEL_PATH_FILES
+INDEX="1"
+for LABEL in "${LABELS[@]}"
+do
+    ORDERED_LABEL_PATH_FILES["${INDEX}"]="${LABEL_TO_PATH_FILE[${LABEL}]}"
+    let "INDEX=${INDEX}+1"
+done
+cat "${ORDERED_LABEL_PATH_FILES[@]}" > "${TARGET_PATH_FILE}"
 echo "DONE: ASSEMBLE"
 
 # Check.
@@ -294,8 +303,8 @@ fi
 echo "DONE: GUNZIP TEST"
 
 # Delete.
-#rm --force "${LABEL_TO_PATH_FILE[@]}"
-#rm --force "${LABEL_TO_LOG_PATH_FILE[@]}"
+rm --force "${LABEL_TO_PATH_FILE[@]}"
+rm --force "${LABEL_TO_LOG_PATH_FILE[@]}"
 
 ################################################################################
 # End of file
