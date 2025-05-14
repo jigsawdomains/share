@@ -9,3 +9,6 @@ chunks, with some logging to assist in any manual recovery.
 
 The expectation is that multiple downloads will be retained and maintained in
 a provided target path.
+
+Usage:
+python zone_file_to_archive_pack.py --help

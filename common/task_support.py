@@ -10,21 +10,22 @@ class Task():
     INIT = "INIT"
     WAIT = "WAIT"
     BUSY = "BUSY"
-    DONE_OKAY = "DONE_OKAY"
-    DONE_FAIL = "DONE_FAIL"
+    DONE = "DONE"
 
-    LEVELS = [INIT,
-              WAIT,
-              BUSY,
-              DONE_OKAY,
-              DONE_FAIL]
+    LEVELS = [INIT, WAIT, BUSY, DONE]
 
     def __init__(self, did_path_file=None):
         self._did_path_file = did_path_file 
         self._level = Task.INIT
         self._popen_command = None
         self._popen_code = None
+        self._popen_stdout = None
+        self._popen_stderr = None
         self._popen = None
+
+    def stop(self, msg):
+        sys.stdout.write(msg)
+        sys.exit(1)
 
     def get_level(self):
         return self._level 
@@ -35,8 +36,11 @@ class Task():
     def get_popen_code(self):
         return self._popen_code 
 
-    def make_command(self):
-        raise NotImplementedError
+    def get_popen_stdout(self):
+        return self._popen_stdout 
+
+    def get_popen_stderr(self):
+        return self._popen_stderr 
 
     def update(self):
         if self._level == Task.INIT:
@@ -44,31 +48,43 @@ class Task():
                 self._level = Task.WAIT
             else:
                 if os.path.isfile(self._did_path_file):
-                    self._level = Task.DONE_OKAY
+                    self._level = Task.DONE
                 else:
                     self._level = Task.WAIT
         elif self._level == Task.BUSY:
             popen_code = self._popen.poll()
             if popen_code is not None:
                 self._popen_code = popen_code
+                self._popen_stdout = self._popen.stdout.read().decode(encoding="latin1")
+                self._popen_stderr = self._popen.stderr.read().decode(encoding="latin1")
                 self._popen = None
-                if self._popen_code == 0:
-                    self._level = Task.DONE_OKAY
+                self.make_outcome()
+                if self.make_result():
                     if self._did_path_file is not None:
                         did_handle = open(self._did_path_file, "w")
                         did_handle.write(f"Did: {datetime.datetime.now().isoformat()}\n")
                         did_handle.flush()
                         did_handle.close()
+                    self._level = Task.DONE
                 else:
-                    self._level = Task.DONE_FAIL
-
-    def get_level(self):
-        return self._level
+                    msg = "Unexpected Failure: Command: {self._popen_command} Code: {self._popen_code}\n"
+                    self.stop(msg)
 
     def launch(self):
-        self._popen_command = self.get_command()
-        self._popen = subprocess.Popen(self._popen_command)
+        self._popen_command = self.make_command()
+        self._popen = subprocess.Popen(self._popen_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self._level = Task.BUSY
+
+    # Override as required:
+
+    def make_command(self):
+        raise NotImplementedError
+
+    def make_result(self):
+        return self._popen_code == 0
+
+    def make_outcome(self):
+        pass
 
 class Snapshot():
 
@@ -95,27 +111,28 @@ class Snapshot():
                 self._level_to_total[Task.BUSY])
 
     def get_done_task_total(self):
-        return (self._level_to_total[Task.DONE_OKAY] +
-                self._level_to_total[Task.DONE_FAIL])
+        return self._level_to_total[Task.DONE]
 
-    def get_both_task_total(self):
+    def get_full_task_total(self):
         return (self.get_left_task_total() + self.get_done_task_total())
 
     def get_percent(self):
-        return int((self.get_left_task_total() / self.get_both_task_total()) * 100)
+        return (100 - int((self.get_left_task_total() / self.get_full_task_total()) * 100))
 
 class Direction():
 
     def __init__(self,
+                 core_total,
                  head_snapshot,
                  tail_snapshot):
+        self._core_total = core_total
         self._head_snapshot = head_snapshot
         self._tail_snapshot = tail_snapshot
         self._duration = (self._tail_snapshot.get_snap_datetime() -
                           self._head_snapshot.get_snap_datetime())
         self._achieved = (self._tail_snapshot.get_done_task_total() -
                           self._head_snapshot.get_done_task_total())
-        if self._achieved > 0:
+        if self._achieved >= self._core_total:
             avg_task_duration = self._duration / self._achieved 
             self._est_duration = self._tail_snapshot.get_left_task_total() * avg_task_duration 
             self._est_complete = self._tail_snapshot.get_snap_datetime() + self._est_duration 
@@ -132,22 +149,30 @@ class Direction():
     def get_summary(self):
         per = self._tail_snapshot.get_percent()
         done = self._tail_snapshot.get_done_task_total()
-        both = self._tail_snapshot.get_both_task_total()
+        full = self._tail_snapshot.get_full_task_total()
+
+        busy = self._tail_snapshot.get_busy_task_total()
+        core = self._core_total
+
         if ((self._est_duration is None) or (self._est_complete is None)):
             edu = "Calculating"
             eco = "Calculating"
         else:
             edu = str(self._est_duration).rstrip("0123456789").rstrip(".")
             eco = str(self._est_complete).rstrip("0123456789").rstrip(".")
-        summary = f"{per}% ({done} of {both}) Duration: {edu} Complete: {eco}"
+        summary = f"{per}% Task: [{done} of {full}] Core: [{busy} of {core}] Duration: {edu} Complete: {eco}"
         return summary
 
 class TaskManager():
 
     def __init__(self,
+                 label,
                  core_total,
+                 idle_freq_seconds=5,
                  track_freq_seconds=None):
+        self._label = label
         self._core_total = core_total
+        self._idle_freq_seconds = idle_freq_seconds
         self._track_freq_seconds = track_freq_seconds
         self._tasks = []
 
@@ -158,16 +183,8 @@ class TaskManager():
     def add_task(self, task):
         self._tasks.append(task)
 
-    def stop_if_done_fail_tasks(self):
-        done_fail_tasks = []
-        for task in self._tasks:
-            if task.get_level() == Task.DONE_FAIL:
-                done_fail_tasks.append(task)
-        if len(done_fail_tasks) > 0:
-            msg = "The following tasks had non zero code:\n"
-            for task in done_fail_tasks:
-                msg = msg + "Command: {task.get_popen_command()} Code: {task.get_popen_code()}\n"
-                self.stop(msg)
+    def get_tasks(self):
+        return self._tasks 
 
     def launch_task(self):
         wait_tasks = []
@@ -186,6 +203,8 @@ class TaskManager():
             task.update()
 
     def execute(self):
+        sys.stdout.write(f"Start: {self._label}\n")
+        sys.stdout.flush()
         track_datetime = None
         if self._track_freq_seconds is None:
             track_duration = None
@@ -202,9 +221,6 @@ class TaskManager():
             # Complete when no left tasks.
             if tail_snapshot.get_left_task_total() == 0:
                 remain = False
-
-            # Stop on any failure.
-            self.stop_if_done_fail_tasks()
  
             # Launch if core available and task waiting.
             if tail_snapshot.get_busy_task_total() < self._core_total:
@@ -222,10 +238,12 @@ class TaskManager():
                         act = True
                 if act:
                     track_datetime = datetime.datetime.now()
-                    direction = Direction(head_snapshot, tail_snapshot)
+                    direction = Direction(self._core_total, head_snapshot, tail_snapshot)
                     summary = direction.get_summary()
                     sys.stdout.write(f"{summary}\n")
                     sys.stdout.flush()
 
             # Idle.
-            time.sleep(5)
+            time.sleep(self._idle_freq_seconds)
+        sys.stdout.write(f"Finish: {self._label}\n")
+        sys.stdout.flush()
