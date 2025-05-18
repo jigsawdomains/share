@@ -67,7 +67,7 @@ class Task():
                         did_handle.close()
                     self._level = Task.DONE
                 else:
-                    msg = "Unexpected Failure: Command: {self._popen_command} Code: {self._popen_code}\n"
+                    msg = f"Unexpected Failure: Command: {self._popen_command} Code: {self._popen_code}\n"
                     self.stop(msg)
 
     def launch(self):

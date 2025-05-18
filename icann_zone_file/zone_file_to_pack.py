@@ -5,11 +5,11 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 import argparse
 import datetime
 import json
-import re
-import subprocess
-import sys
 
 import task_support
+import util
+
+#-------------------------------------------------------------------------------
 
 class TaskAuthentication(task_support.Task):
 
@@ -40,7 +40,9 @@ class TaskAuthentication(task_support.Task):
             self._access_token = data["accessToken"]
         else:
             msg = "Unexpected data format: {data}\n"
-            self.stop(msg)
+            util.stop(msg)
+
+#-------------------------------------------------------------------------------
 
 class TaskLink(task_support.Task):
 
@@ -72,10 +74,12 @@ class TaskLink(task_support.Task):
                     self._link = link
                 else:
                     msg = "Unexpected duplicate links for: {self._tld}\n"
-                    self.stop(msg)
+                    util.stop(msg)
         if self._link is None:
             msg = "Unexpected no link for: {self._tld}\n"
-            self.stop(msg)
+            util.stop(msg)
+
+#-------------------------------------------------------------------------------
 
 class TaskProbe(task_support.Task):
 
@@ -113,10 +117,12 @@ class TaskProbe(task_support.Task):
                 self._content_length = int(line.replace(key,""))
         if self._last_modified_date_obj is None:
             msg = "Absent: last_modified_date_obj\n"
-            self.stop(msg)
+            util.stop(msg)
         if self._content_length is None:
             msg = "Absent: content_length\n"
-            self.stop(msg)
+            util.stop(msg)
+
+#-------------------------------------------------------------------------------
 
 class TaskPart(task_support.Task):
 
@@ -130,7 +136,7 @@ class TaskPart(task_support.Task):
                  part_count,
                  head_index,
                  tail_index,
-                 archive_pack_path):
+                 pack_path):
         self._access_token = access_token 
         self._link = link 
         self._tld = tld
@@ -138,14 +144,14 @@ class TaskPart(task_support.Task):
         self._part_count = part_count
         self._head_index = head_index
         self._tail_index = tail_index
-        self._archive_pack_path = archive_pack_path 
+        self._pack_path = pack_path 
         part_prefix = f"{self._tld}#{self._last_modified_date_str}#{self._part_count:06}"
         dat_file_name = f"{part_prefix}#part.dat.bin"
         did_file_name = f"{part_prefix}#part.did.txt"
         log_file_name = f"{part_prefix}#part.log.txt"
-        self._dat_path_file = os.path.join(self._archive_pack_path, dat_file_name)
-        self._did_path_file = os.path.join(self._archive_pack_path, did_file_name)
-        self._log_path_file = os.path.join(self._archive_pack_path, log_file_name)
+        self._dat_path_file = os.path.join(self._pack_path, dat_file_name)
+        self._did_path_file = os.path.join(self._pack_path, did_file_name)
+        self._log_path_file = os.path.join(self._pack_path, log_file_name)
         task_support.Task.__init__(self, did_path_file=self._did_path_file) 
 
     def get_dat_path_file(self):
@@ -168,6 +174,8 @@ class TaskPart(task_support.Task):
         os.remove(self._did_path_file)
         os.remove(self._log_path_file)
 
+#-------------------------------------------------------------------------------
+
 class TaskCheck(task_support.Task):
 
     def __init__(self, 
@@ -180,6 +188,8 @@ class TaskCheck(task_support.Task):
                    "--test", self._full_path_file]
         return command
 
+#-------------------------------------------------------------------------------
+
 class Main():
 
     BLOCK_SIZE = 1024 * 64
@@ -189,7 +199,7 @@ class Main():
         self._icann_user = None
         self._icann_password = None
         self._tld = None
-        self._archive_pack_path = None
+        self._pack_path = None
         self._core_total = None
 
         # State.
@@ -223,10 +233,10 @@ class Main():
                                      help="TLD. "
                                           "Must be available in the ICANN account. "
                                           "(Mandatory)")
-        argument_parser.add_argument("--archive_pack_path",
+        argument_parser.add_argument("--pack_path",
                                      type=str,
                                      required=True,
-                                     help="Archive pack path. "
+                                     help="Pack path. "
                                           "Must exist. "
                                           "(Mandatory)")
         argument_parser.add_argument("--part_size",
@@ -244,10 +254,7 @@ class Main():
         self._icann_user = namespace.icann_user 
         self._icann_password = namespace.icann_password 
         self._tld = namespace.tld 
-        self._archive_pack_path = os.path.abspath(namespace.archive_pack_path)
-        if not os.path.isdir(self._archive_pack_path):
-            msg = "--archive_pack_path not a path\n"
-            self.stop(msg)
+        self._pack_path = util.make_item_path_exist(namespace.pack_path)
         self._part_size = namespace.part_size
         self._core_total = namespace.core_total
 
@@ -275,7 +282,7 @@ class Main():
         self._last_modified_date_str = task_probe.get_last_modified_date_str()
         self._content_length = task_probe.get_content_length()
         full_file_name = f"{self._tld}#{self._last_modified_date_str}#full.txt.gz"
-        self._full_path_file = os.path.join(self._archive_pack_path, full_file_name)
+        self._full_path_file = os.path.join(self._pack_path, full_file_name)
         sys.stdout.write(f"Last modified date: {self._last_modified_date_str}\n")
         sys.stdout.write(f"Content length: {self._content_length}\n")
         sys.stdout.flush()
@@ -295,7 +302,7 @@ class Main():
                                  part_count,
                                  head_index,
                                  tail_index,
-                                 self._archive_pack_path)
+                                 self._pack_path)
             task_manager.add_task(task_part)
             head_index = tail_index + 1
             part_count = part_count + 1

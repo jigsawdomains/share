@@ -1,5 +1,9 @@
 Script to download ICANN zone files.
 
+Dependencies:
+See common DEPENDENCIES.txt
+
+Purpose:
 The ICANN protocol is defined here:
 https://github.com/icann/czds-api-client-java/blob/master/docs/ICANN_CZDS_api.pdf
 
@@ -11,4 +15,5 @@ The expectation is that multiple downloads will be retained and maintained in
 a provided target path.
 
 Usage:
+python3 -m venv $HOME/virtpython
 python zone_file_to_archive_pack.py --help
