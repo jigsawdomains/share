@@ -15,5 +15,5 @@ The expectation is that multiple downloads will be retained and maintained in
 a provided target path.
 
 Usage:
-python3 -m venv $HOME/virtpython
-python zone_file_to_archive_pack.py --help
+source $HOME/virtpython/bin/activate
+python download_zone_file_to_pack.py --help

@@ -1,8 +1,15 @@
+# Internal
 import datetime
 import os
+import shlex
 import subprocess
 import sys
 import time
+
+# Local
+import util
+
+#-------------------------------------------------------------------------------
 
 class Task():
 
@@ -14,7 +21,10 @@ class Task():
 
     LEVELS = [INIT, WAIT, BUSY, DONE]
 
-    def __init__(self, did_path_file=None):
+    def __init__(self,
+                 log_path_file=None,
+                 did_path_file=None):
+        self._log_path_file = log_path_file 
         self._did_path_file = did_path_file 
         self._level = Task.INIT
         self._popen_command = None
@@ -22,10 +32,6 @@ class Task():
         self._popen_stdout = None
         self._popen_stderr = None
         self._popen = None
-
-    def stop(self, msg):
-        sys.stdout.write(msg)
-        sys.exit(1)
 
     def get_level(self):
         return self._level 
@@ -42,6 +48,35 @@ class Task():
     def get_popen_stderr(self):
         return self._popen_stderr 
 
+    def present_popen_command(self):
+        present = ""
+        for part in self._popen_command:
+            if present != "":
+                present = present + " "
+            present = present + shlex.quote(part)
+        return present
+
+    def _process_did_path_file(self):
+        if self._did_path_file is not None:
+            did_handle = open(self._did_path_file, "w")
+            did_handle.write(f"Did: {datetime.datetime.now().isoformat()}\n")
+            did_handle.close()
+
+    def _process_log_path_file(self):
+        if self._log_path_file is not None:
+            log_handle = open(self._log_path_file, "w")
+            log_handle.write(f"popen_command:\n")
+            log_handle.write(f"{self.present_popen_command()}\n")
+            log_handle.write(f"popen_code:\n")
+            log_handle.write(f"{self._popen_code}\n")
+            log_handle.write(f"make_result:\n")
+            log_handle.write(f"{self.make_result()}\n")
+            log_handle.write(f"stdout:\n")
+            log_handle.write(self._popen_stdout)
+            log_handle.write(f"stderr:\n")
+            log_handle.write(self._popen_stderr)
+            log_handle.close()
+
     def update(self):
         if self._level == Task.INIT:
             if self._did_path_file is None:
@@ -54,21 +89,24 @@ class Task():
         elif self._level == Task.BUSY:
             popen_code = self._popen.poll()
             if popen_code is not None:
+                self._level = Task.DONE
                 self._popen_code = popen_code
                 self._popen_stdout = self._popen.stdout.read().decode(encoding="latin1")
                 self._popen_stderr = self._popen.stderr.read().decode(encoding="latin1")
                 self._popen = None
                 self.make_outcome()
+                self._process_log_path_file()
                 if self.make_result():
-                    if self._did_path_file is not None:
-                        did_handle = open(self._did_path_file, "w")
-                        did_handle.write(f"Did: {datetime.datetime.now().isoformat()}\n")
-                        did_handle.flush()
-                        did_handle.close()
-                    self._level = Task.DONE
+                    self._process_did_path_file()
                 else:
-                    msg = f"Unexpected Failure: Command: {self._popen_command} Code: {self._popen_code}\n"
-                    self.stop(msg)
+                    msg = ""
+                    msg = msg + "Unexpected Failure:"
+                    msg = msg + f" Command: {self.present_popen_command()}"
+                    msg = msg + f" Code: {self._popen_code}"
+                    if self._log_path_file is not None:
+                        msg = msg + f" Log: {self._log_path_file}"
+                    msg = msg + "\n"
+                    util.stop(msg)
 
     def launch(self):
         self._popen_command = self.make_command()
@@ -85,6 +123,8 @@ class Task():
 
     def make_outcome(self):
         pass
+
+#-------------------------------------------------------------------------------
 
 class Snapshot():
 
@@ -118,6 +158,8 @@ class Snapshot():
 
     def get_percent(self):
         return (100 - int((self.get_left_task_total() / self.get_full_task_total()) * 100))
+
+#-------------------------------------------------------------------------------
 
 class Direction():
 
@@ -163,6 +205,8 @@ class Direction():
         summary = f"{per}% Task: [{done} of {full}] Core: [{busy} of {core}] Duration: {edu} Complete: {eco}"
         return summary
 
+#-------------------------------------------------------------------------------
+
 class TaskManager():
 
     def __init__(self,
@@ -175,10 +219,6 @@ class TaskManager():
         self._idle_freq_seconds = idle_freq_seconds
         self._track_freq_seconds = track_freq_seconds
         self._tasks = []
-
-    def stop(self, msg):
-        sys.stdout.write(msg)
-        sys.exit(1)
 
     def add_task(self, task):
         self._tasks.append(task)
@@ -196,7 +236,7 @@ class TaskManager():
             wait_task.launch()
         else:
             msg = "Unable to launch as no waiting task\n"
-            self.stop(msg)
+            util.stop(msg)
 
     def update(self):
         for task in self._tasks:

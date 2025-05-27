@@ -1,0 +1,85 @@
+--------------------------------------------------
+MariaDB
+--------------------------------------------------
+sudo mysql_secure_installation 
+
+Enter current password for root (enter for none): <enter>
+Switch to unix_socket authentication [Y/n] n
+Change the root password? [Y/n] Y
+maria
+maria
+Remove anonymous users? [Y/n] Y
+Disallow root login remotely? [Y/n] Y
+Remove test database and access to it? [Y/n] Y
+Reload privilege tables now? [Y/n] Y
+
+--------------------------------------------------
+User Setup
+--------------------------------------------------
+mariadb -u root -p --password=maria
+CREATE USER "jd"@"localhost" IDENTIFIED BY "jd1234";
+GRANT Create ON *.* TO "jd"@"localhost";
+GRANT Insert ON *.* TO "jd"@"localhost";
+GRANT Select ON *.* TO "jd"@"localhost";
+FLUSH PRIVILEGES;
+EXIT;
+
+--------------------------------------------------
+Setup Database
+--------------------------------------------------
+mariadb -u jd -p --password=jd1234
+
+CREATE DATABASE domains;
+USE domains;
+
+CREATE TABLE sld (
+    label VARCHAR(63) NOT NULL,
+    sld_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    PRIMARY KEY (label),
+    UNIQUE KEY (sld_id)
+);
+
+CREATE TABLE tld (
+    label VARCHAR(63) NOT NULL,
+    tld_id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    PRIMARY KEY (label),
+    UNIQUE KEY (tld_id)
+);
+
+CREATE TABLE fqdn (
+    sld_id INT UNSIGNED NOT NULL,
+    tld_id TINYINT UNSIGNED NOT NULL,
+    start DATE NULL,
+    until DATE NULL,
+    PRIMARY KEY (sld_id, tld_id)
+);
+
+EXIT;
+
+--------------------------------------------------
+Delete Database
+--------------------------------------------------
+mariadb -u root -p --password=maria
+DROP DATABASE domains;
+
+--------------------------------------------------
+Root Session
+--------------------------------------------------
+mariadb -u root -p --password=maria
+
+--------------------------------------------------
+User Session
+--------------------------------------------------
+mariadb -u jd -p --password=jd1234
+
+--------------------------------------------------
+Handy Commands
+--------------------------------------------------
+USE domains;
+SHOW PRIVILEGES;
+SELECT * FROM sld;
+SELECT sld_id FROM sld WHERE label = 'label';
+ALTER TABLE fqdn RENAME COLUMN `earliest` TO `from`;
+SELECT * FROM fqdn LIMIT 20;
+SELECT COUNT(*) FROM sld;
+
