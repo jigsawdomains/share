@@ -1,10 +1,12 @@
+# Setup
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"))
 
+# Internal
 import argparse
-import datetime
 
+# Local
 import util
 
 #-------------------------------------------------------------------------------
@@ -20,7 +22,7 @@ class Main():
         # Arguments.
         self._zone_file_path_file = None
         self._part_size = None
-        self._pack_path = None
+        self._load_zone_file_pack_path = None
 
         # State.
         self._zone_file_tld = None
@@ -44,10 +46,10 @@ class Main():
                                      required=True,
                                      help="Part size. "
                                           "(Mandatory)")
-        argument_parser.add_argument("--pack_path",
+        argument_parser.add_argument("--load_zone_file_pack_path",
                                      type=str,
                                      required=True,
-                                     help="Transfer pack path. "
+                                     help="Load Zone File pack path. "
                                           "Must exist and must be empty. "
                                           "(Mandatory)")
 
@@ -62,14 +64,14 @@ class Main():
         self._zone_file_tld = zone_file_file_name_parts[0]
         self._zone_file_date_obj = util.make_item_date_obj(zone_file_file_name_parts[1])
         self._part_size = namespace.part_size
-        self._pack_path = util.make_item_path_exist_empty(namespace.pack_path)
+        self._load_zone_file_pack_path = util.make_item_path_exist_empty(namespace.load_zone_file_pack_path)
         self._zone_file_octet_total = os.path.getsize(self._zone_file_path_file)
         self._zone_file_octet_count = 0
 
     def generate_pack_sld(self, zone_file_handle):
         self._part_number = self._part_number + 1
         sld_file_name = f"{self._part_number:06}.sld.txt"
-        sld_path_file = os.path.join(self._pack_path, sld_file_name)
+        sld_path_file = os.path.join(self._load_zone_file_pack_path, sld_file_name)
         sld_handle = open(sld_path_file, "w")
         remain = True
         current_part_size = 0
@@ -114,7 +116,7 @@ class Main():
 
     def generate_pack_tld(self):
         tld_file_name = f"tld.txt"
-        tld_path_file = os.path.join(self._pack_path, tld_file_name)
+        tld_path_file = os.path.join(self._load_zone_file_pack_path, tld_file_name)
         tld_handle = open(tld_path_file, "w")
         tld_handle.write(f"zone_file_tld:{self._zone_file_tld}\n")
         tld_handle.write(f"zone_file_date_str:{self._zone_file_date_obj.isoformat()}\n")

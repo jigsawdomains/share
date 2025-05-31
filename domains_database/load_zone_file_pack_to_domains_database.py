@@ -17,34 +17,34 @@ class TaskSld(task_support.Task):
     def __init__(self, 
                  zone_file_tld,
                  zone_file_date_obj,
-                 database_user,
-                 database_password,
-                 database_name,
-                 pack_path,
+                 domains_database_user,
+                 domains_database_password,
+                 domains_database_name,
+                 load_zone_file_pack_path,
                  sld_file_name):
         self._zone_file_tld = zone_file_tld 
         self._zone_file_date_obj = zone_file_date_obj
-        self._database_user = database_user
-        self._database_password = database_password
-        self._database_name = database_name
-        self._sld_path_file = os.path.join(pack_path, sld_file_name)
-        log_path_file = os.path.join(pack_path, sld_file_name.replace(".sld.txt", ".log.txt"))
-        did_path_file = os.path.join(pack_path, sld_file_name.replace(".sld.txt", ".did.txt"))
+        self._domains_database_user = domains_database_user
+        self._domains_database_password = domains_database_password
+        self._domains_database_name = domains_database_name
+        self._sld_path_file = os.path.join(load_zone_file_pack_path, sld_file_name)
+        log_path_file = os.path.join(load_zone_file_pack_path, sld_file_name.replace(".sld.txt", ".log.txt"))
+        did_path_file = os.path.join(load_zone_file_pack_path, sld_file_name.replace(".sld.txt", ".did.txt"))
         task_support.Task.__init__(self,
                                    log_path_file=log_path_file,
                                    did_path_file=did_path_file) 
 
     def make_command(self):
-        pack_to_database_path_file = os.path.abspath(__file__)
-        pack_to_database_path = os.path.dirname(pack_to_database_path_file)
-        pack_to_database_sld_path_file = os.path.join(pack_to_database_path, "pack_to_database_sld.py")
+        pack_to_domains_database_path_file = os.path.abspath(__file__)
+        pack_to_domains_database_path = os.path.dirname(pack_to_domains_database_path_file)
+        pack_to_domains_database_sld_path_file = os.path.join(pack_to_domains_database_path, "load_zone_file_pack_to_domains_database_sld.py")
         command = [sys.executable,
-                   pack_to_database_sld_path_file,
+                   pack_to_domains_database_sld_path_file,
                    "--zone_file_tld", self._zone_file_tld,
                    "--zone_file_date_str", self._zone_file_date_obj.isoformat(),
-                   "--database_user", self._database_user,
-                   "--database_password", self._database_password, 
-                   "--database_name", self._database_name,
+                   "--domains_database_user", self._domains_database_user,
+                   "--domains_database_password", self._domains_database_password, 
+                   "--domains_database_name", self._domains_database_name,
                    "--sld_path_file", self._sld_path_file]
         return command
 
@@ -54,10 +54,10 @@ class Main():
 
     def __init__(self):
         # Arguments.
-        self._pack_path = None
-        self._database_user = None
-        self._database_password = None
-        self._database_name = None
+        self._load_zone_file_pack_path = None
+        self._domains_database_user = None
+        self._domains_database_password = None
+        self._domains_database_name = None
         self._core_total = None
 
         # State.
@@ -66,26 +66,26 @@ class Main():
 
     def process_arguments(self):
         argument_parser = argparse.ArgumentParser()
-        argument_parser.add_argument("--pack_path",
+        argument_parser.add_argument("--load_zone_file_pack_path",
                                      type=str,
                                      required=True,
-                                     help="Transfer pack path. "
+                                     help="Load Zone File pack path. "
                                           "Must exist. "
                                           "(Mandatory)")
-        argument_parser.add_argument("--database_user",
+        argument_parser.add_argument("--domains_database_user",
                             type=str,
                             required=True,
-                            help="Database user. "
+                            help="Domains Database user. "
                                  "(Mandatory)")
-        argument_parser.add_argument("--database_password",
+        argument_parser.add_argument("--domains_database_password",
                             type=str,
                             required=True,
-                            help="Database password. "
+                            help="Domains Database password. "
                                  "(Mandatory)")
-        argument_parser.add_argument("--database_name",
+        argument_parser.add_argument("--domains_database_name",
                             type=str,
                             required=True,
-                            help="Database name. "
+                            help="Domains Database name. "
                                  "(Mandatory)")
         argument_parser.add_argument("--core_total",
                             type=int,
@@ -94,15 +94,15 @@ class Main():
                                  "(Mandatory)")
 
         namespace = argument_parser.parse_args()
-        self._pack_path = util.make_item_path_exist(namespace.pack_path)
-        self._database_user = namespace.database_user
-        self._database_password = namespace.database_password
-        self._database_name = namespace.database_name
+        self._load_zone_file_pack_path = util.make_item_path_exist(namespace.load_zone_file_pack_path)
+        self._domains_database_user = namespace.domains_database_user
+        self._domains_database_password = namespace.domains_database_password
+        self._domains_database_name = namespace.domains_database_name
         self._core_total = namespace.core_total
 
     def process_tld(self):
         tld_file_name = f"tld.txt"
-        tld_path_file = os.path.join(self._pack_path, tld_file_name)
+        tld_path_file = os.path.join(self._load_zone_file_pack_path, tld_file_name)
         tld_handle = open(tld_path_file, "r")
         lines = []
         for line in tld_handle:
@@ -124,16 +124,16 @@ class Main():
 
     def process_sld(self):
         task_manager = task_support.TaskManager("Slds", self._core_total, idle_freq_seconds=5, track_freq_seconds=30)
-        file_names = os.listdir(self._pack_path)
+        file_names = os.listdir(self._load_zone_file_pack_path)
         for file_name in sorted(file_names):
             if file_name.endswith(".sld.txt"):
-                sld_path_file = os.path.join(self._pack_path, file_name)
+                sld_path_file = os.path.join(self._load_zone_file_pack_path, file_name)
                 task_sld = TaskSld(self._zone_file_tld,
                                    self._zone_file_date_obj,
-                                   self._database_user,
-                                   self._database_password,
-                                   self._database_name,
-                                   self._pack_path,
+                                   self._domains_database_user,
+                                   self._domains_database_password,
+                                   self._domains_database_name,
+                                   self._load_zone_file_pack_path,
                                    file_name)
                 task_manager.add_task(task_sld)
         task_manager.execute()

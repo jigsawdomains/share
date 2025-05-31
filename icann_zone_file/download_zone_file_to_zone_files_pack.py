@@ -8,7 +8,7 @@ import argparse
 import datetime
 import json
 
-# Internal
+# Local
 import task_support
 import util
 
@@ -139,7 +139,7 @@ class TaskPart(task_support.Task):
                  part_count,
                  head_index,
                  tail_index,
-                 pack_path):
+                 zone_files_pack_path):
         self._access_token = access_token 
         self._link = link 
         self._tld = tld
@@ -147,15 +147,15 @@ class TaskPart(task_support.Task):
         self._part_count = part_count
         self._head_index = head_index
         self._tail_index = tail_index
-        self._pack_path = pack_path 
+        self._zone_files_pack_path = zone_files_pack_path 
         part_prefix = f"{self._tld}#{self._last_modified_date_str}#{self._part_count:06}"
         dat_file_name = f"{part_prefix}#part.dat.bin"
         did_file_name = f"{part_prefix}#part.did.txt"
         log_file_name = f"{part_prefix}#part.log.txt"
-        self._dat_path_file = os.path.join(self._pack_path, dat_file_name)
-        self._did_path_file = os.path.join(self._pack_path, did_file_name)
-        self._log_path_file = os.path.join(self._pack_path, log_file_name)
-        task_support.Task.__init__(self, did_path_file=self._did_path_file) 
+        self._dat_path_file = os.path.join(self._zone_files_pack_path, dat_file_name)
+        did_path_file = os.path.join(self._zone_files_pack_path, did_file_name)
+        log_path_file = os.path.join(self._zone_files_pack_path, log_file_name)
+        task_support.Task.__init__(self, did_path_file=did_path_file, log_path_file=log_path_file) 
 
     def get_dat_path_file(self):
         return self._dat_path_file
@@ -167,7 +167,6 @@ class TaskPart(task_support.Task):
                    "--request", "GET",
                    "--header", f"Authorization: Bearer {self._access_token}",
                    "--range", f"{self._head_index}-{self._tail_index}",
-                   "--stderr", self._log_path_file,
                    "--output", self._dat_path_file,
                    self._link]
         return command
@@ -202,7 +201,7 @@ class Main():
         self._icann_user = None
         self._icann_password = None
         self._tld = None
-        self._pack_path = None
+        self._zone_files_pack_path = None
         self._core_total = None
 
         # State.
@@ -236,10 +235,10 @@ class Main():
                                      help="TLD. "
                                           "Must be available in the ICANN account. "
                                           "(Mandatory)")
-        argument_parser.add_argument("--pack_path",
+        argument_parser.add_argument("--zone_files_pack_path",
                                      type=str,
                                      required=True,
-                                     help="Pack path. "
+                                     help="Zone Files Pack path. "
                                           "Must exist. "
                                           "(Mandatory)")
         argument_parser.add_argument("--part_size",
@@ -257,7 +256,7 @@ class Main():
         self._icann_user = namespace.icann_user 
         self._icann_password = namespace.icann_password 
         self._tld = namespace.tld 
-        self._pack_path = util.make_item_path_exist(namespace.pack_path)
+        self._zone_files_pack_path = util.make_item_path_exist(namespace.zone_files_pack_path)
         self._part_size = namespace.part_size
         self._core_total = namespace.core_total
 
@@ -285,7 +284,7 @@ class Main():
         self._last_modified_date_str = task_probe.get_last_modified_date_str()
         self._content_length = task_probe.get_content_length()
         full_file_name = f"{self._tld}#{self._last_modified_date_str}#full.txt.gz"
-        self._full_path_file = os.path.join(self._pack_path, full_file_name)
+        self._full_path_file = os.path.join(self._zone_files_pack_path, full_file_name)
         sys.stdout.write(f"Last modified date: {self._last_modified_date_str}\n")
         sys.stdout.write(f"Content length: {self._content_length}\n")
         sys.stdout.flush()
@@ -305,7 +304,7 @@ class Main():
                                  part_count,
                                  head_index,
                                  tail_index,
-                                 self._pack_path)
+                                 self._zone_files_pack_path)
             task_manager.add_task(task_part)
             head_index = tail_index + 1
             part_count = part_count + 1

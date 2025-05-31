@@ -58,6 +58,13 @@ def make_item_path_file_absent(item):
         stop(msg)
     return item_path_file
 
+#-------------------------------------------------------------------------------
+
+def make_int_ge(item, limit):
+    if item < limit:
+        msg = f"Value: {item} must be greater than or equal to: {limit}\n"
+        stop(msg)
+    return item
 
 #-------------------------------------------------------------------------------
 

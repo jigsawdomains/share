@@ -21,9 +21,9 @@ class Main():
         # Arguments.
         self._zone_file_tld = None
         self._zone_file_date_obj = None
-        self._database_user = None
-        self._database_password = None
-        self._database_name = None
+        self._domains_database_user = None
+        self._domains_database_password = None
+        self._domains_database_name = None
         self._sld_path_file = None
 
         # State.
@@ -45,20 +45,20 @@ class Main():
                                      required=True,
                                      help="Zone File date (YYYY-MM-DD). "
                                           "(Mandatory)")
-        argument_parser.add_argument("--database_user",
+        argument_parser.add_argument("--domains_database_user",
                             type=str,
                             required=True,
-                            help="Database user. "
+                            help="Domains Database user. "
                                  "(Mandatory)")
-        argument_parser.add_argument("--database_password",
+        argument_parser.add_argument("--domains_database_password",
                             type=str,
                             required=True,
-                            help="Database password. "
+                            help="Domains Database password. "
                                  "(Mandatory)")
-        argument_parser.add_argument("--database_name",
+        argument_parser.add_argument("--domains_database_name",
                             type=str,
                             required=True,
-                            help="Database name. "
+                            help="Domains Database name. "
                                  "(Mandatory)")
         argument_parser.add_argument("--sld_path_file",
                             type=str,
@@ -70,16 +70,16 @@ class Main():
         namespace = argument_parser.parse_args()
         self._zone_file_tld = namespace.zone_file_tld
         self._zone_file_date_obj = util.make_item_date_obj(namespace.zone_file_date_str)
-        self._database_user = namespace.database_user
-        self._database_password = namespace.database_password
-        self._database_name = namespace.database_name
+        self._domains_database_user = namespace.domains_database_user
+        self._domains_database_password = namespace.domains_database_password
+        self._domains_database_name = namespace.domains_database_name
         self._sld_path_file = util.make_item_path_file_exist(namespace.sld_path_file)
         self._zone_file_date_str = self._zone_file_date_obj.isoformat()
 
     def open_database(self):
-        self._con = util.make_database_connection(self._database_user,
-                                                  self._database_password,
-                                                  self._database_name)
+        self._con = util.make_database_connection(self._domains_database_user,
+                                                  self._domains_database_password,
+                                                  self._domains_database_name)
         self._cur = util.make_database_cursor(self._con)
 
     def process_tld(self):
@@ -112,32 +112,35 @@ class Main():
             msg = f"SQL: {sql} with unexpected result: {result_tuples}\n"
             util.stop(msg)
 
-        sql = f"SELECT fqdn.from, fqdn.upto FROM fqdn WHERE fqdn.tld_id='{self._tld_id}' AND fqdn.sld_id='{sld_id}';"
+        sql = f"SELECT known, start, until FROM fqdn WHERE fqdn.tld_id='{self._tld_id}' AND fqdn.sld_id='{sld_id}';"
         self._cur.execute(sql)
         result_tuples = list(self._cur)
         if len(result_tuples) == 0:
-            sql = f"INSERT INTO fqdn (fqdn.tld_id, fqdn.sld_id, fqdn.from, fqdn.upto) VALUES ('{self._tld_id}', '{sld_id}', '{self._zone_file_date_str}', '{self._zone_file_date_str}');"
+            sql = f"INSERT INTO fqdn (fqdn.tld_id, fqdn.sld_id, fqdn.known, fqdn.start, fqdn.until) VALUES ('{self._tld_id}', '{sld_id}', '{True:d}', '{self._zone_file_date_str}', '{self._zone_file_date_str}');"
             self._cur.execute(sql)
             self._con.commit()
             sld_id = self._cur.lastrowid
         elif len(result_tuples) == 1:
-            from_date_obj = result_tuples[0][0]
-            upto_date_obj = result_tuples[0][1]
+            known = result_tuples[0][0]
+            start_date_obj = result_tuples[0][1]
+            until_date_obj = result_tuples[0][2]
             update = False
-            if self._zone_file_date_obj < from_date_obj:
-                adopt_from_date_str = self._zone_file_date_str
+            if not known:
+                update = True
+            if self._zone_file_date_obj < start_date_obj:
+                adopt_start_date_str = self._zone_file_date_str
                 update = True
             else:
-                adopt_from_date_str = from_date_obj.isoformat()
+                adopt_start_date_str = start_date_obj.isoformat()
 
-            if self._zone_file_date_obj > upto_date_obj:
-                adopt_upto_date_str = self._zone_file_date_str
+            if self._zone_file_date_obj > until_date_obj:
+                adopt_until_date_str = self._zone_file_date_str
                 update = True
             else:
-                adopt_upto_date_str = upto_date_obj.isoformat()
+                adopt_until_date_str = until_date_obj.isoformat()
 
             if update:
-                sql = f"UPDATE fqdn SET fqdn.from='{adopt_from_date_str}', fqdn.upto='{adopt_upto_date_str}' WHERE fqdn.tld_id='{self._tld_id}' AND fqdn.sld_id='{sld_id}';"
+                sql = f"UPDATE fqdn SET fqdn.known='{True:d}', fqdn.start='{adopt_start_date_str}', fqdn.until='{adopt_until_date_str}' WHERE fqdn.tld_id='{self._tld_id}' AND fqdn.sld_id='{sld_id}';"
                 self._cur.execute(sql)
                 self._con.commit()
         else:
