@@ -55,12 +55,13 @@ class Main():
     def __init__(self):
         # Arguments.
         self._load_zone_file_pack_path = None
-        self._domains_database_user = None
-        self._domains_database_password = None
-        self._domains_database_name = None
         self._core_total = None
 
         # State.
+        self._config = None
+        self._domains_database_user = None
+        self._domains_database_password = None
+        self._domains_database_name = None
         self._zone_file_tld = None
         self._zone_file_date_obj = None
 
@@ -72,57 +73,27 @@ class Main():
                                      help="Load Zone File pack path. "
                                           "Must exist. "
                                           "(Mandatory)")
-        argument_parser.add_argument("--domains_database_user",
-                            type=str,
-                            required=True,
-                            help="Domains Database user. "
-                                 "(Mandatory)")
-        argument_parser.add_argument("--domains_database_password",
-                            type=str,
-                            required=True,
-                            help="Domains Database password. "
-                                 "(Mandatory)")
-        argument_parser.add_argument("--domains_database_name",
-                            type=str,
-                            required=True,
-                            help="Domains Database name. "
-                                 "(Mandatory)")
         argument_parser.add_argument("--core_total",
                             type=int,
                             required=True,
                             help="Number of cores. "
+                                 "Must be 1 or more. "
                                  "(Mandatory)")
 
         namespace = argument_parser.parse_args()
         self._load_zone_file_pack_path = util.make_item_path_exist(namespace.load_zone_file_pack_path)
-        self._domains_database_user = namespace.domains_database_user
-        self._domains_database_password = namespace.domains_database_password
-        self._domains_database_name = namespace.domains_database_name
-        self._core_total = namespace.core_total
+        self._core_total = util.make_int_ge(namespace.core_total, 1)
 
-    def process_tld(self):
-        tld_file_name = f"tld.txt"
-        tld_path_file = os.path.join(self._load_zone_file_pack_path, tld_file_name)
-        tld_handle = open(tld_path_file, "r")
-        lines = []
-        for line in tld_handle:
-            lines.append(line.strip())
-        tld_handle.close()
-        for line in lines:
-            key = "zone_file_tld:"
-            if line.startswith(key):
-                self._zone_file_tld = line.replace(key,"")
-            key = "zone_file_date_str:"
-            if line.startswith(key):
-                self._zone_file_date_obj = util.make_item_date_obj(line.replace(key,""))
-        if self._zone_file_tld is None:
-            msg = "Absent: zone_file_tld\n"
-            util.stop(msg)
-        if self._zone_file_date_obj is None:
-            msg = "Absent: zone_file_date_str\n"
-            util.stop(msg)
+    def process_config(self):
+        self._config = util.Config(self._load_zone_file_pack_path)
+        self._config.read()
+        self._domains_database_user = self._config.make_value("domains_database_user")
+        self._domains_database_password = self._config.make_value("domains_database_password")
+        self._domains_database_name = self._config.make_value("domains_database_name")
+        self._zone_file_tld = self._config.make_value("zone_file_tld")
+        self._zone_file_date_obj = util.make_item_date_obj(self._config.make_value("zone_file_date_str"))
 
-    def process_sld(self):
+    def process_slds(self):
         task_manager = task_support.TaskManager("Slds", self._core_total, idle_freq_seconds=5, track_freq_seconds=30)
         file_names = os.listdir(self._load_zone_file_pack_path)
         for file_name in sorted(file_names):
@@ -140,8 +111,8 @@ class Main():
 
     def start(self):
         self.process_arguments()
-        self.process_tld()
-        self.process_sld()
+        self.process_config()
+        self.process_slds()
 
 #-------------------------------------------------------------------------------
 

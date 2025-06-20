@@ -79,37 +79,58 @@ def make_item_date_obj(item):
 
 #-------------------------------------------------------------------------------
 
-def ensure_valid_from_upto(from_date_obj, upto_date_obj):
-    if from_date_obj > upto_date_obj:
-        msg = ""
-        msg = msg + f"empty date range (as from is after upto) "
-        msg = msg + f"from: {from_date_obj.isoformat()} "
-        msg = msg + f"upto: {upto_date_obj.isoformat()}"
-        msg = msg + "\n"
-        stop(msg)
+def make_start_until_none_date_obj_tuple(none_date_objs):
+    date_objs = []
+    for none_date_obj in none_date_objs:
+        if none_date_obj is not None:
+            date_objs.append(none_date_obj)
+    date_objs = sorted(date_objs)
+    if len(date_objs) == 0:
+        result = (None, None)
+    else:
+        result = (date_objs[0], date_objs[-1])
+    return result
 
 #-------------------------------------------------------------------------------
 
-def make_database_connection(database_user, database_password, database_name):
-    try:
-        con = mariadb.connect(user=database_user,
-                              password=database_password,
-                              database=database_name)
-    except mariadb.Error as e:
-        msg=f"Error connecting to database: {e}\n"
-        stop(msg)
-    con.autocommit = False
-    return con
+class Config():
 
-#-------------------------------------------------------------------------------
+    FILE_NAME = f"config.txt"
 
-def make_database_cursor(con):
-    return con.cursor()
+    def __init__(self, config_path):
+        self._config_path = config_path
+        self._config_path_file = os.path.join(self._config_path, Config.FILE_NAME)
+        self._key_to_value = {}
 
-#-------------------------------------------------------------------------------
+    def add_key_to_value(self, key, value):
+        self._key_to_value[key] = value
 
-# Assumes:
-# from1_date_obj <= upto1_date_obj
-# from2_date_obj <= upto2_date_obj
-def range_overlap(from1_date_obj, upto1_date_obj, from2_date_obj, upto2_date_obj):
-    return ((from1_date_obj <= upto2_date_obj) and (upto1_date_obj >= from2_date_obj))
+    def make_value(self, key):
+        if key not in self._key_to_value.keys():
+            msg = f"Provided key not known: {str(key)}\n"
+            stop(msg)
+        return self._key_to_value[key]
+
+    def read(self):
+        self._key_to_value = {}
+        handle = open(self._config_path_file, "r")
+        lines = []
+        for line in handle:
+            lines.append(line.strip())
+        handle.close()
+        for line in lines:
+            parts = line.split(":")
+            if len(parts) == 2:
+                key = parts[0]
+                value = parts[1]
+                self._key_to_value[key] = value
+            else:
+                msg = f"Unexpected format: {line}\n"
+                stop(msg)
+
+    def write(self):
+        handle = open(self._config_path_file, "w")
+        for key in sorted(self._key_to_value.keys()):
+            value = self._key_to_value[key]
+            handle.write(f"{key}:{value}\n")
+        handle.close()

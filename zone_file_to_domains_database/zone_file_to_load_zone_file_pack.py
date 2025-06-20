@@ -20,6 +20,9 @@ class Main():
 
     def __init__(self):
         # Arguments.
+        self._domains_database_user = None
+        self._domains_database_password = None
+        self._domains_database_name = None
         self._zone_file_path_file = None
         self._part_size = None
         self._load_zone_file_pack_path = None
@@ -27,6 +30,7 @@ class Main():
         # State.
         self._zone_file_tld = None
         self._zone_file_date_obj = None
+        self._config = None
         self._zone_file_octet_total = None
         self._zone_file_octet_count = None
         self._last_sld = None
@@ -34,6 +38,21 @@ class Main():
 
     def process_arguments(self):
         argument_parser = argparse.ArgumentParser()
+        argument_parser.add_argument("--domains_database_user",
+                            type=str,
+                            required=True,
+                            help="Domains Database user. "
+                                 "(Mandatory)")
+        argument_parser.add_argument("--domains_database_password",
+                            type=str,
+                            required=True,
+                            help="Domains Database password. "
+                                 "(Mandatory)")
+        argument_parser.add_argument("--domains_database_name",
+                            type=str,
+                            required=True,
+                            help="Domains Database name. "
+                                 "(Mandatory)")
         argument_parser.add_argument("--zone_file_path_file",
                                      type=str,
                                      required=True,
@@ -45,6 +64,7 @@ class Main():
                                      type=int,
                                      required=True,
                                      help="Part size. "
+                                          "Must be 1 or more. "
                                           "(Mandatory)")
         argument_parser.add_argument("--load_zone_file_pack_path",
                                      type=str,
@@ -54,7 +74,9 @@ class Main():
                                           "(Mandatory)")
 
         namespace = argument_parser.parse_args()
-
+        self._domains_database_user = namespace.domains_database_user
+        self._domains_database_password = namespace.domains_database_password
+        self._domains_database_name = namespace.domains_database_name
         self._zone_file_path_file = util.make_item_path_file_exist(namespace.zone_file_path_file)
         zone_file_file_name = os.path.basename(self._zone_file_path_file)
         zone_file_file_name_parts = zone_file_file_name.split("#")
@@ -63,12 +85,12 @@ class Main():
             util.stop(msg)
         self._zone_file_tld = zone_file_file_name_parts[0]
         self._zone_file_date_obj = util.make_item_date_obj(zone_file_file_name_parts[1])
-        self._part_size = namespace.part_size
+        self._part_size = util.make_int_ge(namespace.part_size, 1)
         self._load_zone_file_pack_path = util.make_item_path_exist_empty(namespace.load_zone_file_pack_path)
         self._zone_file_octet_total = os.path.getsize(self._zone_file_path_file)
         self._zone_file_octet_count = 0
 
-    def generate_pack_sld(self, zone_file_handle):
+    def generate_sld(self, zone_file_handle):
         self._part_number = self._part_number + 1
         sld_file_name = f"{self._part_number:06}.sld.txt"
         sld_path_file = os.path.join(self._load_zone_file_pack_path, sld_file_name)
@@ -114,33 +136,34 @@ class Main():
         sld_handle.close()
         return remain
 
-    def generate_pack_tld(self):
-        tld_file_name = f"tld.txt"
-        tld_path_file = os.path.join(self._load_zone_file_pack_path, tld_file_name)
-        tld_handle = open(tld_path_file, "w")
-        tld_handle.write(f"zone_file_tld:{self._zone_file_tld}\n")
-        tld_handle.write(f"zone_file_date_str:{self._zone_file_date_obj.isoformat()}\n")
-        tld_handle.close()
+    def generate_config(self):
+        self._config = util.Config(self._load_zone_file_pack_path)
+        self._config.add_key_to_value("domains_database_user", self._domains_database_user)
+        self._config.add_key_to_value("domains_database_password", self._domains_database_password)
+        self._config.add_key_to_value("domains_database_name", self._domains_database_name)
+        self._config.add_key_to_value("zone_file_tld", self._zone_file_tld)
+        self._config.add_key_to_value("zone_file_date_str", self._zone_file_date_obj.isoformat())
+        self._config.write()
 
-    def generate_pack_slds(self):
+    def generate_slds(self):
         zone_file_handle = open(self._zone_file_path_file, "r")
         # Discard header.
         zone_file_handle.readline()
         remain = True
         last_per = None
         while remain:
-            remain = self.generate_pack_sld(zone_file_handle)
+            remain = self.generate_sld(zone_file_handle)
             per = int((self._zone_file_octet_count / self._zone_file_octet_total) * 100)
             if per != last_per:
-                sys.stdout.write(f"{per}%\n")
-                sys.stdout.flush()
+                util.info(f"{per}%\n")
                 last_per = per
+        util.info(f"{per}%\n")
         zone_file_handle.close()
 
     def start(self):
         self.process_arguments()
-        self.generate_pack_tld()
-        self.generate_pack_slds()
+        self.generate_config()
+        self.generate_slds()
 
 if __name__ == '__main__':
     main = Main()
