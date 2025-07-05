@@ -94,9 +94,9 @@ class Task():
                 self._popen_stdout = self._popen.stdout.read().decode(encoding="latin1")
                 self._popen_stderr = self._popen.stderr.read().decode(encoding="latin1")
                 self._popen = None
-                self.make_outcome()
                 self._process_log_path_file()
                 if self.make_result():
+                    self.make_outcome()
                     self._process_did_path_file()
                 else:
                     msg = ""
@@ -210,9 +210,9 @@ class Direction():
 class TaskManager():
 
     def __init__(self,
-                 label,
-                 core_total,
-                 idle_freq_seconds=5,
+                 label=None,
+                 core_total=1,
+                 idle_freq_seconds=1,
                  track_freq_seconds=None):
         self._label = label
         self._core_total = core_total
@@ -243,8 +243,8 @@ class TaskManager():
             task.update()
 
     def execute(self):
-        sys.stdout.write(f"Start: {self._label}\n")
-        sys.stdout.flush()
+        if self._label is not None:
+            util.info(f"Start: {self._label}\n")
         track_datetime = None
         if self._track_freq_seconds is None:
             track_duration = None
@@ -280,10 +280,9 @@ class TaskManager():
                     track_datetime = datetime.datetime.now()
                     direction = Direction(self._core_total, head_snapshot, tail_snapshot)
                     summary = direction.get_summary()
-                    sys.stdout.write(f"{summary}\n")
-                    sys.stdout.flush()
+                    util.info(f"{summary}\n")
 
             # Idle.
             time.sleep(self._idle_freq_seconds)
-        sys.stdout.write(f"Finish: {self._label}\n")
-        sys.stdout.flush()
+        if self._label is not None:
+            util.info(f"Finish: {self._label}\n")
