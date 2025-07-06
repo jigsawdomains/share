@@ -3,7 +3,6 @@ import datetime
 import os
 import shlex
 import subprocess
-import sys
 import time
 
 # Local
@@ -283,6 +282,7 @@ class TaskManager():
                     util.info(f"{summary}\n")
 
             # Idle.
-            time.sleep(self._idle_freq_seconds)
+            if remain:
+                time.sleep(self._idle_freq_seconds)
         if self._label is not None:
             util.info(f"Finish: {self._label}\n")

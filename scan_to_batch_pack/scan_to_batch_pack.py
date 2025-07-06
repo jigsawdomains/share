@@ -8,44 +8,39 @@ import argparse
 import itertools
 
 # Local
-import task_support
 import util
 
 #-------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
 
 class Main():
 
     def __init__(self):
         # Arguments.
+        self._domains_database_user = None
+        self._domains_database_password = None
+        self._inspect_date = None
         self._scan_key_values = None
         self._scan_formats = None
-        self._inspect_date_obj = None
-        self._zero_sources_use_rdap = None
         self._part_size = None
         self._batch_pack_path = None
 
-
-### configure . txt
-### configure . txt
-### configure . txt
-
-### control  . txt
-### config . txt
-
-
     def process_arguments(self):
         argument_parser = argparse.ArgumentParser()
-
+        argument_parser.add_argument("--domains_database_user",
+                            type=str,
+                            required=True,
+                            help="Domains Database user. "
+                                 "(Mandatory)")
+        argument_parser.add_argument("--domains_database_password",
+                            type=str,
+                            required=True,
+                            help="Domains Database password. "
+                                 "(Mandatory)")
+        argument_parser.add_argument("--inspect_date",
+                                     type=str,
+                                     required=True,
+                                     help="Inspect date (YYYY-MM-DD). "
+                                          "(Mandatory)")
         argument_parser.add_argument("--scan_key_value",
                                      type=str,
                                      nargs='+',
@@ -65,16 +60,6 @@ class Main():
                                           "Must expand to legal domain name. "
                                           "Example: theLL.com "
                                           "(Mandatory)")
-        argument_parser.add_argument("--inspect_date_str",
-                                     type=str,
-                                     required=True,
-                                     help="Inspect date (YYYY-MM-DD). "
-                                          "(Mandatory)")
-        argument_parser.add_argument("--zero_sources_use_rdap",
-                                     default=False,
-                                     action="store_true",
-                                     help="If a FQDN has zero sources, use RDAP. "
-                                          "(Mandatory)")
         argument_parser.add_argument("--part_size",
                                      type=int,
                                      required=True,
@@ -89,6 +74,9 @@ class Main():
                                           "(Mandatory)")
 
         namespace = argument_parser.parse_args()
+        self._domains_database_user = namespace.domains_database_user
+        self._domains_database_password = namespace.domains_database_password
+        self._inspect_date = util.make_item_date(namespace.inspect_date)
         self._scan_key_values = namespace.scan_key_value
         for scan_key_value in self._scan_key_values:
             if len(scan_key_value) < 2:
@@ -128,7 +116,14 @@ class Main():
         scan_parts = update_scan_parts
         return scan_parts
 
-    def generate(self):
+    def generate_config(self):
+        self._config = util.Config(self._batch_pack_path)
+        self._config.add_entry_str("domains_database_user", self._domains_database_user)
+        self._config.add_entry_str("domains_database_password", self._domains_database_password)
+        self._config.add_entry_date("inspect_date", self._inspect_date)
+        self._config.write()
+
+    def generate_fqdns(self):
         # Scan Products.
         scan_products = []
         for scan_format in self._scan_formats:
@@ -160,7 +155,8 @@ class Main():
 
     def start(self):
         self.process_arguments()
-        self.generate()
+        self.generate_config()
+        self.generate_fqdns()
 
 if __name__ == '__main__':
     main = Main()

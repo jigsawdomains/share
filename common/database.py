@@ -153,8 +153,6 @@ class DomainsDB():
                 sources = now_sources + [req_source]
                 update = True
 
-            print(sources)
-
             # Assess: Start to Until.
             (start_none_date, until_none_date) = util.make_start_until_none_date_tuple([req_start_none_date,
                                                                                         req_until_none_date,
@@ -165,10 +163,6 @@ class DomainsDB():
                 update = True
 
             # Potential: Update.
-            print(update)
-            print(start_none_date)
-            print(until_none_date)
-            print(update)
             if update:
                 self._cur.execute("UPDATE fqdn "
                                   "SET fqdn.sources=?, fqdn.start=?, fqdn.until=? "

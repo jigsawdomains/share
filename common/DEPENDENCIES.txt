@@ -20,3 +20,8 @@ Virtual Python
 --------------------------------------------------
 python3 -m venv $HOME/virtpython
 $HOME/virtpython/bin/pip install mariadb
+
+--------------------------------------------------
+Database
+--------------------------------------------------
+See common DATABASE.txt

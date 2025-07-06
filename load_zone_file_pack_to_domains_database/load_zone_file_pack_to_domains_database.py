@@ -7,44 +7,41 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 import argparse
 
 # Local
-import task_support
+import distribute
 import util
 
 #-------------------------------------------------------------------------------
 
-class TaskSld(task_support.Task):
+class TaskSld(distribute.Task):
 
     def __init__(self, 
-                 zone_file_tld,
-                 zone_file_date_obj,
                  domains_database_user,
                  domains_database_password,
-                 domains_database_name,
+                 zone_file_tld,
+                 zone_file_date,
                  load_zone_file_pack_path,
                  sld_file_name):
-        self._zone_file_tld = zone_file_tld 
-        self._zone_file_date_obj = zone_file_date_obj
         self._domains_database_user = domains_database_user
         self._domains_database_password = domains_database_password
-        self._domains_database_name = domains_database_name
+        self._zone_file_tld = zone_file_tld 
+        self._zone_file_date = zone_file_date
         self._sld_path_file = os.path.join(load_zone_file_pack_path, sld_file_name)
         log_path_file = os.path.join(load_zone_file_pack_path, sld_file_name.replace(".sld.txt", ".log.txt"))
         did_path_file = os.path.join(load_zone_file_pack_path, sld_file_name.replace(".sld.txt", ".did.txt"))
-        task_support.Task.__init__(self,
-                                   log_path_file=log_path_file,
-                                   did_path_file=did_path_file) 
+        distribute.Task.__init__(self,
+                                 log_path_file=log_path_file,
+                                 did_path_file=did_path_file) 
 
     def make_command(self):
-        pack_to_domains_database_path_file = os.path.abspath(__file__)
-        pack_to_domains_database_path = os.path.dirname(pack_to_domains_database_path_file)
-        pack_to_domains_database_sld_path_file = os.path.join(pack_to_domains_database_path, "load_zone_file_pack_to_domains_database_sld.py")
+        script_path_file = os.path.abspath(__file__)
+        script_path = os.path.dirname(script_path_file)
+        sld_py_path_file = os.path.join(script_path, "load_zone_file_pack_to_domains_database_sld.py")
         command = [sys.executable,
-                   pack_to_domains_database_sld_path_file,
-                   "--zone_file_tld", self._zone_file_tld,
-                   "--zone_file_date_str", self._zone_file_date_obj.isoformat(),
+                   sld_py_path_file,
                    "--domains_database_user", self._domains_database_user,
                    "--domains_database_password", self._domains_database_password, 
-                   "--domains_database_name", self._domains_database_name,
+                   "--zone_file_tld", self._zone_file_tld,
+                   "--zone_file_date", self._zone_file_date.isoformat(),
                    "--sld_path_file", self._sld_path_file]
         return command
 
@@ -61,9 +58,8 @@ class Main():
         self._config = None
         self._domains_database_user = None
         self._domains_database_password = None
-        self._domains_database_name = None
         self._zone_file_tld = None
-        self._zone_file_date_obj = None
+        self._zone_file_date = None
 
     def process_arguments(self):
         argument_parser = argparse.ArgumentParser()
@@ -87,23 +83,24 @@ class Main():
     def process_config(self):
         self._config = util.Config(self._load_zone_file_pack_path)
         self._config.read()
-        self._domains_database_user = self._config.make_value("domains_database_user")
-        self._domains_database_password = self._config.make_value("domains_database_password")
-        self._domains_database_name = self._config.make_value("domains_database_name")
-        self._zone_file_tld = self._config.make_value("zone_file_tld")
-        self._zone_file_date_obj = util.make_item_date_obj(self._config.make_value("zone_file_date_str"))
+        self._domains_database_user = self._config.get_value("domains_database_user")
+        self._domains_database_password = self._config.get_value("domains_database_password")
+        self._zone_file_tld = self._config.get_value("zone_file_tld")
+        self._zone_file_date = self._config.get_value("zone_file_date")
 
     def process_slds(self):
-        task_manager = task_support.TaskManager("Slds", self._core_total, idle_freq_seconds=5, track_freq_seconds=30)
+        task_manager = distribute.TaskManager(label="Slds",
+                                              core_total=self._core_total,
+                                              idle_freq_seconds=5,
+                                              track_freq_seconds=30)
         file_names = os.listdir(self._load_zone_file_pack_path)
         for file_name in sorted(file_names):
             if file_name.endswith(".sld.txt"):
                 sld_path_file = os.path.join(self._load_zone_file_pack_path, file_name)
-                task_sld = TaskSld(self._zone_file_tld,
-                                   self._zone_file_date_obj,
-                                   self._domains_database_user,
+                task_sld = TaskSld(self._domains_database_user,
                                    self._domains_database_password,
-                                   self._domains_database_name,
+                                   self._zone_file_tld,
+                                   self._zone_file_date,
                                    self._load_zone_file_pack_path,
                                    file_name)
                 task_manager.add_task(task_sld)

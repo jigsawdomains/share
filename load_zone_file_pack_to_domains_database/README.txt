@@ -1,13 +1,11 @@
-Infrastructure for a minimal domain database.
+Overview:
+Transfer a load zone file pack into a domains database.
 
 Dependencies:
 See common DEPENDENCIES.txt
 
 Purpose:
-Provide a basic view of whether or nor a domain name is registered, retaining
-only its earliest (start) and latest (until) known registration dates. While
-basic, this provides expedient (time and space efficient) lookup for whether
-or not a domain name is registered.
+Update the minimal domain database, based on a provided zone file pack.
 
 Setup:
 See SETUP.txt

@@ -9,12 +9,12 @@ import datetime
 import json
 
 # Local
-import task_support
+import distribute
 import util
 
 #-------------------------------------------------------------------------------
 
-class TaskAuthentication(task_support.Task):
+class TaskAuthentication(distribute.Task):
 
     def __init__(self, 
                  icann_user,
@@ -22,7 +22,7 @@ class TaskAuthentication(task_support.Task):
         self._icann_user = icann_user 
         self._icann_password = icann_password
         self._access_token = None
-        task_support.Task.__init__(self) 
+        distribute.Task.__init__(self) 
 
     def get_access_token(self):
         return self._access_token
@@ -47,7 +47,7 @@ class TaskAuthentication(task_support.Task):
 
 #-------------------------------------------------------------------------------
 
-class TaskLink(task_support.Task):
+class TaskLink(distribute.Task):
 
     def __init__(self, 
                  access_token,
@@ -55,7 +55,7 @@ class TaskLink(task_support.Task):
         self._access_token = access_token 
         self._tld = tld 
         self._link = None
-        task_support.Task.__init__(self) 
+        distribute.Task.__init__(self) 
 
     def get_link(self):
         return self._link
@@ -84,19 +84,19 @@ class TaskLink(task_support.Task):
 
 #-------------------------------------------------------------------------------
 
-class TaskProbe(task_support.Task):
+class TaskProbe(distribute.Task):
 
     def __init__(self, 
                  access_token,
                  link):
         self._access_token = access_token 
         self._link = link 
-        self._last_modified_date_obj = None
+        self._last_modified_date = None
         self._content_length = None
-        task_support.Task.__init__(self) 
+        distribute.Task.__init__(self) 
 
-    def get_last_modified_date_str(self):
-        return self._last_modified_date_obj.isoformat()
+    def get_last_modified_date(self):
+        return self._last_modified_date
 
     def get_content_length(self):
         return self._content_length
@@ -114,12 +114,12 @@ class TaskProbe(task_support.Task):
             line = line.strip()
             key = "Last-Modified: "
             if line.startswith(key):
-                self._last_modified_date_obj = datetime.datetime.strptime(line.replace(key,""), "%a, %d %b %Y %H:%M:%S %Z").date()
+                self._last_modified_date = datetime.datetime.strptime(line.replace(key,""), "%a, %d %b %Y %H:%M:%S %Z").date()
             key = "Content-Length: "
             if line.startswith(key):
                 self._content_length = int(line.replace(key,""))
-        if self._last_modified_date_obj is None:
-            msg = "Absent: last_modified_date_obj\n"
+        if self._last_modified_date is None:
+            msg = "Absent: last_modified_date\n"
             util.stop(msg)
         if self._content_length is None:
             msg = "Absent: content_length\n"
@@ -127,7 +127,7 @@ class TaskProbe(task_support.Task):
 
 #-------------------------------------------------------------------------------
 
-class TaskPart(task_support.Task):
+class TaskPart(distribute.Task):
 
     RETRY_TOTAL = 3
 
@@ -135,7 +135,7 @@ class TaskPart(task_support.Task):
                  access_token,
                  link,
                  tld,
-                 last_modified_date_str,
+                 last_modified_date,
                  part_count,
                  head_index,
                  tail_index,
@@ -143,19 +143,19 @@ class TaskPart(task_support.Task):
         self._access_token = access_token 
         self._link = link 
         self._tld = tld
-        self._last_modified_date_str = last_modified_date_str
+        self._last_modified_date = last_modified_date
         self._part_count = part_count
         self._head_index = head_index
         self._tail_index = tail_index
         self._zone_files_pack_path = zone_files_pack_path 
-        part_prefix = f"{self._tld}#{self._last_modified_date_str}#{self._part_count:06}"
+        part_prefix = f"{self._tld}#{self._last_modified_date.isoformat()}#{self._part_count:06}"
         dat_file_name = f"{part_prefix}#part.dat.bin"
         did_file_name = f"{part_prefix}#part.did.txt"
         log_file_name = f"{part_prefix}#part.log.txt"
         self._dat_path_file = os.path.join(self._zone_files_pack_path, dat_file_name)
         did_path_file = os.path.join(self._zone_files_pack_path, did_file_name)
         log_path_file = os.path.join(self._zone_files_pack_path, log_file_name)
-        task_support.Task.__init__(self, did_path_file=did_path_file, log_path_file=log_path_file) 
+        distribute.Task.__init__(self, did_path_file=did_path_file, log_path_file=log_path_file) 
 
     def get_dat_path_file(self):
         return self._dat_path_file
@@ -178,12 +178,12 @@ class TaskPart(task_support.Task):
 
 #-------------------------------------------------------------------------------
 
-class TaskCheck(task_support.Task):
+class TaskCheck(distribute.Task):
 
     def __init__(self, 
                  full_path_file):
         self._full_path_file = full_path_file 
-        task_support.Task.__init__(self) 
+        distribute.Task.__init__(self) 
 
     def make_command(self):
         command = ["gunzip",
@@ -207,7 +207,7 @@ class Main():
         # State.
         self._access_token = None
         self._link = None
-        self._last_modified_date_str = None
+        self._last_modified_date = None
         self._content_length = None
         self._full_path_file = None
         self._part_tasks = None
@@ -257,19 +257,21 @@ class Main():
         self._icann_password = namespace.icann_password 
         self._tld = namespace.tld 
         self._zone_files_pack_path = util.make_item_path_exist(namespace.zone_files_pack_path)
-        self._part_size = namespace.part_size
-        self._core_total = namespace.core_total
+        self._part_size = util.make_int_ge(namespace.part_size, 1)
+        self._core_total = util.make_int_ge(namespace.core_total, 1)
 
     def authentication(self):
         task_authentication = TaskAuthentication(self._icann_user, self._icann_password)
-        task_manager = task_support.TaskManager("Authentication", self._core_total, idle_freq_seconds=1)
+        task_manager = distribute.TaskManager(label="Authentication",
+                                              core_total=self._core_total)
         task_manager.add_task(task_authentication)
         task_manager.execute()
         self._access_token = task_authentication.get_access_token()
 
     def link(self):
         task_link = TaskLink(self._access_token, self._tld)
-        task_manager = task_support.TaskManager("Link", self._core_total, idle_freq_seconds=1)
+        task_manager = distribute.TaskManager(label="Link",
+                                              core_total=self._core_total)
         task_manager.add_task(task_link)
         task_manager.execute()
         self._link = task_link.get_link()
@@ -278,19 +280,23 @@ class Main():
 
     def probe(self):
         task_probe = TaskProbe(self._access_token, self._link)
-        task_manager = task_support.TaskManager("Probe", self._core_total, idle_freq_seconds=1)
+        task_manager = distribute.TaskManager(label="Probe",
+                                              core_total=self._core_total)
         task_manager.add_task(task_probe)
         task_manager.execute()
-        self._last_modified_date_str = task_probe.get_last_modified_date_str()
+        self._last_modified_date = task_probe.get_last_modified_date()
         self._content_length = task_probe.get_content_length()
-        full_file_name = f"{self._tld}#{self._last_modified_date_str}#full.txt.gz"
+        full_file_name = f"{self._tld}#{self._last_modified_date.isoformat()}#full.txt.gz"
         self._full_path_file = os.path.join(self._zone_files_pack_path, full_file_name)
-        sys.stdout.write(f"Last modified date: {self._last_modified_date_str}\n")
+        sys.stdout.write(f"Last modified date: {self._last_modified_date.isoformat()}\n")
         sys.stdout.write(f"Content length: {self._content_length}\n")
         sys.stdout.flush()
 
     def acquire(self):
-        task_manager = task_support.TaskManager("Parts", self._core_total, idle_freq_seconds=5, track_freq_seconds=30)
+        task_manager = distribute.TaskManager(label="Parts",
+                                              core_total=self._core_total,
+                                              idle_freq_seconds=5,
+                                              track_freq_seconds=30)
         part_count = 1
         head_index = 0
         while head_index < self._content_length:
@@ -300,7 +306,7 @@ class Main():
             task_part = TaskPart(self._access_token,
                                  self._link,
                                  self._tld,
-                                 self._last_modified_date_str,
+                                 self._last_modified_date,
                                  part_count,
                                  head_index,
                                  tail_index,
@@ -326,7 +332,8 @@ class Main():
         full_handle.close()
 
     def check(self):
-        task_manager = task_support.TaskManager("Check", self._core_total, idle_freq_seconds=1)
+        task_manager = distribute.TaskManager(label="Check",
+                                              core_total=self._core_total)
         task_check = TaskCheck(self._full_path_file)
         task_manager.add_task(task_check)
         task_manager.execute()

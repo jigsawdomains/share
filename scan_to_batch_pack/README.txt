@@ -1,15 +1,14 @@
-Script to create a scan file (an algorithmically generated list of domain
-names). Further scripts may be used to process the scan file.
+Script to create a batch pack, from a scan description.
 
 Dependencies:
 See common DEPENDENCIES.txt
 
 Purpose:
-A scan file may be used to measure the domains database. It is generally
-understood that every LLLL.com is registered, and thus any detected
-unregistered LLLL.com is likely a deficiency of the database.
+A batch pack contains a set of domain names, to be checked for availability
+against a provided domains database. The scan description describes a set of
+domain names, through a concisely described, algorithmically expanded pattern,
+which is used to generate an interesting batch pack for assessment.
 
 Usage:
 source $HOME/virtpython/bin/activate
-python download_zone_file_to_pack.py --help
-
+python scan_to_batch_pack.py --help
