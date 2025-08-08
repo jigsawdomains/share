@@ -44,7 +44,7 @@ def make_item_path_exist_empty(item):
 
 def make_item_path_file_viable(item):
     item_path_file = os.path.abspath(item)
-    item_path = os.path.basename(item_path_file)
+    item_path = os.path.dirname(item_path_file)
     if not os.path.isdir(item_path):
         msg = f"Not a path: {item_path}\n"
         stop(msg)

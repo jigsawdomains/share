@@ -28,32 +28,32 @@ class Main():
     def process_arguments(self):
         argument_parser = argparse.ArgumentParser()
         argument_parser.add_argument("--domains_database_user",
-                            type=str,
-                            required=True,
-                            help="Domains Database user. "
-                                 "(Mandatory)")
+                                     type=str,
+                                     required=True,
+                                     help="Domains Database user. "
+                                          "(Mandatory)")
         argument_parser.add_argument("--domains_database_password",
-                            type=str,
-                            required=True,
-                            help="Domains Database password. "
-                                 "(Mandatory)")
+                                     type=str,
+                                     required=True,
+                                     help="Domains Database password. "
+                                          "(Mandatory)")
         argument_parser.add_argument("--zone_file_tld",
-                            type=str,
-                            required=True,
-                            help="Zone File TLD. "
-                                 "Must exist. "
-                                 "(Mandatory)")
+                                     type=str,
+                                     required=True,
+                                     help="Zone File TLD. "
+                                          "Must exist. "
+                                          "(Mandatory)")
         argument_parser.add_argument("--zone_file_date",
                                      type=str,
                                      required=True,
                                      help="Zone File date (YYYY-MM-DD). "
                                           "(Mandatory)")
         argument_parser.add_argument("--sld_path_file",
-                            type=str,
-                            required=True,
-                            help="SLD path file. "
-                                 "Must exist. "
-                                 "(Mandatory)")
+                                     type=str,
+                                     required=True,
+                                     help="SLD path file. "
+                                          "Must exist. "
+                                          "(Mandatory)")
 
         namespace = argument_parser.parse_args()
         self._domains_database_user = namespace.domains_database_user

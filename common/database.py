@@ -39,23 +39,40 @@ class DomainsDB():
         self._con.autocommit = False
         self._cur = self._con.cursor()
         self._tld_label_to_tld_id = {}
-        self._update()
+        self._tld_id_to_captures = {}
+        self._update_tld_label_to_tld_id()
 
-    def _update(self):
+    def _update_tld_label_to_tld_id(self):
         self._tld_label_to_tld_id = {}
         self._cur.execute("SELECT tld.tld_label, tld.tld_id "
                           "FROM tld;")
+        self._con.commit()
         result_tuples = list(self._cur)
         for result_tuple in result_tuples:
             tld_label = result_tuple[0]
             tld_id = result_tuple[1]
             self._tld_label_to_tld_id[tld_label] = tld_id 
 
+    def _update_tld_id_to_captures(self):
+        self._tld_id_to_captures = {}
+        self._cur.execute("SELECT zone_file.tld_id, zone_file.capture "
+                          "FROM zone_file;")
+        self._con.commit()
+        result_tuples = list(self._cur)
+        for result_tuple in result_tuples:
+            tld_id = result_tuple[0]
+            capture_date = result_tuple[1]
+            if 
+
+            self._tld_label_to_tld_id[tld_label] = tld_id 
+
+
     def _find_none_sld_id(self, req_sld_label):
         self._cur.execute("SELECT sld.sld_id "
                           "FROM sld "
                           "WHERE sld.sld_label=?;",
                           (req_sld_label,))
+        self._con.commit()
         result_tuples = list(self._cur)
         if len(result_tuples) == 0:
             sld_id = None
@@ -85,11 +102,11 @@ class DomainsDB():
 
     def _make_tld_id(self, req_tld_label):
         if req_tld_label not in self._tld_label_to_tld_id.keys():
-            self._cur.execute("INSERT INTO tld (tld.label) "
+            self._cur.execute("INSERT INTO tld (tld.tld_label) "
                               "VALUES (?);",
                               (req_tld_label,))
             self._con.commit()
-            self.update()
+            self._update_tld_label_to_tld_id()
         return self._tld_label_to_tld_id[req_tld_label]
 
     def inspect_fqdn(self,
@@ -107,6 +124,7 @@ class DomainsDB():
                           "ON fqdn.sld_id = sld.sld_id "
                           "WHERE sld.sld_label=? AND fqdn.tld_id=?;",
                           (req_sld_label, tld_id))
+        self._con.commit()
         result_tuples = list(self._cur)
         if len(result_tuples) == 0:
             result = None
@@ -129,6 +147,7 @@ class DomainsDB():
                           "FROM fqdn "
                           "WHERE fqdn.sld_id=? AND fqdn.tld_id=?;",
                           (sld_id, tld_id))
+        self._con.commit()
         result_tuples = list(self._cur)
         if len(result_tuples) == 0:
             # Mandate: Update.

@@ -1,0 +1,8 @@
+popen_command:
+/home/bill/virtpython/bin/python /home/bill/JigsawDomains/github/share/check_batch_pack/check_batch_pack_fqdn.py --domains_database_user jd --domains_database_password jd1234 --inspect_date 2025-01-01 --fqdn_path_file /home/bill/JigsawDomains/github/share/check_batch_pack/llll/000004.fqdn.txt --report_path_file /home/bill/JigsawDomains/github/share/check_batch_pack/llll/000004.report.txt
+popen_code:
+0
+make_result:
+True
+stdout:
+stderr:

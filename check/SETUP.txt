@@ -44,27 +44,34 @@ CREATE DATABASE domains;
 USE domains;
 
 CREATE TABLE sld (
-    sld_label VARCHAR(63) NOT NULL,
+    label VARCHAR(63) NOT NULL,
     sld_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (sld_label),
+    PRIMARY KEY (label),
     UNIQUE KEY (sld_id)
 );
 
 CREATE TABLE tld (
-    tld_label VARCHAR(63) NOT NULL,
+    label VARCHAR(63) NOT NULL,
     tld_id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (tld_label),
+    PRIMARY KEY (label),
     UNIQUE KEY (tld_id)
 );
 
-# start: Earliest observed registered date. May be NULL.
-# until: Latest observed registered date. May be NULL.
+# Where known is true:
+# The domain has been registered.
+# start: Earliest observed registered date.
+# until: Latest observed registered date.
+# 
+# Where known is false:
+# The domain has not been registered.
+# start: Earliest observed not registered date.
+# until: Latest observed not registered date.
 CREATE TABLE fqdn (
     sld_id INT UNSIGNED NOT NULL,
     tld_id TINYINT UNSIGNED NOT NULL,
-    sources SET('ZONE_FILE', 'RDAP') NOT NULL,
-    start DATE NULL,
-    until DATE NULL,
+    known BOOLEAN NOT NULL,
+    start DATE NOT NULL,
+    until DATE NOT NULL,
     PRIMARY KEY (sld_id, tld_id)
 );
 
@@ -88,19 +95,12 @@ USE domains;
 SHOW PRIVILEGES;
 SELECT * FROM sld;
 SELECT sld_id FROM sld WHERE label = 'label';
-SELECT * from fqdn INNER JOIN sld ON fqdn.sld_id = sld.sld_id WHERE sld.sld_label="qwerty";
-ALTER TABLE tld RENAME COLUMN `label` TO `tld_label`;
-ALTER TABLE sld RENAME COLUMN `label` TO `sld_label`;
-ALTER TABLE fqdn DROP COLUMN known;
 ALTER TABLE fqdn RENAME COLUMN `earliest` TO `from`;
 SELECT * FROM fqdn LIMIT 20;
 SELECT COUNT(*) FROM sld;
 INSERT TRUE into hello;
 ALTER TABLE fqdn ADD COLUMN known BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE fqdn ALTER COLUMN known DROP DEFAULT;
-ALTER TABLE fqdn MODIFY COLUMN start DATE NULL;
-ALTER TABLE fqdn MODIFY COLUMN until DATE NULL;
 ALTER TABLE fqdn MODIFY COLUMN start DATE NOT NULL;
 ALTER TABLE fqdn MODIFY COLUMN until DATE NOT NULL;
 SELECT @@innodb_buffer_pool_size;
-ALTER TABLE fqdn ADD COLUMN source SET('ZONE_FILE', 'RDAP') NOT NULL DEFAULT 'ZONE_FILE';

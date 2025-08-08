@@ -1,0 +1,3 @@
+domains_database_password:TYPE_STR:jd1234
+domains_database_user:TYPE_STR:jd
+inspect_date:TYPE_DATE:2025-01-01

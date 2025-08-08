@@ -7,18 +7,18 @@ import random
 import time
 
 # Local
-import task_support
+import distribute
 import database
 import util
 
 #-------------------------------------------------------------------------------
 
-class TaskRDAP(task_support.Task):
+class TaskRDAP(distribute.Task):
 
     def __init__(self, sld_label, tld_label):
         self._sld_label = sld_label 
         self._tld_label = tld_label 
-        task_support.Task.__init__(self) 
+        distribute.Task.__init__(self) 
         self._found = None
         self._data = None
 
@@ -59,11 +59,9 @@ class TaskRDAP(task_support.Task):
 
 class RDAP():
 
-    #REQUEST_PER_MIN = 30
-    REQUEST_PER_MIN = 5
-
+    REQUEST_PER_MIN = 60
+    TMP_PATH = "/tmp"
     LOCK_FILE_NAME = "lock.txt"
-    STAT_FILE_NAME = "stat.txt"
 
     # https://www.iana.org/assignments/rdap-json-values/rdap-json-values.xhtml
 
@@ -96,16 +94,28 @@ class RDAP():
                    EVENT_REGISTRAR_EXPIRATION,
                    EVENT_ENUM_VALIDATION_EXPIRATION]
 
+    # The expiration date is actually the start of an expiration process,
+    # whose duration is somewhat register dependent.
+
+    # https://www.icann.org/en/icann-acronyms-and-terms/auto-renew-grace-period-en
+    # https://www.icann.org/en/icann-acronyms-and-terms/redemption-grace-period-en
+
+    # State transition from Expire to Dropped:
+    # Auto-Renew Grace Period(AGP) | 30 days
+    # Redemption Grace Period(RGP) | 30 days
+    # Pending Delete Period        | 5 days
+
+    TLD_LABEL_TO_EXPIRATION_DAYS = {}
+    TLD_LABEL_TO_EXPIRATION_DAYS["com"] = 30 + 30 + 5
+
     def __init__(self,
-                 item_path,
                  domains_database_user,
                  domains_database_password):
-        self._item_path = item_path
         self._domains_database_user = domains_database_user
         self._domains_database_password = domains_database_password
         self._domains_db = database.DomainsDB(self._domains_database_user,
                                               self._domains_database_password)
-        self._lock_path_file = os.path.join(self._item_path, RDAP.LOCK_FILE_NAME)
+        self._lock_path_file = os.path.join(RDAP.TMP_PATH, RDAP.LOCK_FILE_NAME)
         self._lock_handle = None
 
     def _init_lock(self):
@@ -165,7 +175,7 @@ class RDAP():
 
     def _action(self, sld_label, tld_label):
         task_rdap = TaskRDAP(sld_label, tld_label)
-        task_manager = task_support.TaskManager()
+        task_manager = distribute.TaskManager()
         task_manager.add_task(task_rdap)
         task_manager.execute()
 
@@ -182,6 +192,10 @@ class RDAP():
                         found = False
                         if event_action in RDAP.TAKE_EVENTS:
                             found = True
+                            if event_action == RDAP.EVENT_EXPIRATION:
+                                if tld_label in RDAP.TLD_LABEL_TO_EXPIRATION_DAYS.keys():
+                                    expiration_days = RDAP.TLD_LABEL_TO_EXPIRATION_DAYS[tld_label]
+                                    event_date = event_date + datetime.timedelta(days=expiration_days)
                             register_dates.append(event_date)
                         if event_action in RDAP.SKIP_EVENTS:
                             found = True
@@ -197,7 +211,6 @@ class RDAP():
 
         (start_none_date, until_none_date) = util.make_start_until_none_date_tuple(register_dates)
         req_source = database.DomainsDB.RDAP
-        print(register_dates)
         self._domains_db.update_fqdn(req_source,
                                      sld_label,
                                      tld_label,
@@ -208,7 +221,5 @@ class RDAP():
         self._init_lock()
         self._wait_lock()
         self._wait_rate()
-        print("qqqqqq")
         self._action(sld_label, tld_label)
-        print("ddddqqqqqq")
         self._cede_lock()

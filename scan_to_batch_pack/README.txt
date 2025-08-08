@@ -1,4 +1,5 @@
-Script to create a batch pack, from a scan description.
+Overview:
+Create a batch pack, from a scan description.
 
 Dependencies:
 See common DEPENDENCIES.txt

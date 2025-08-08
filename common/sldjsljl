@@ -1,0 +1,177 @@
+# Internal
+import os
+import sys
+import datetime
+
+# External
+import mariadb
+
+#-------------------------------------------------------------------------------
+
+def make_database_connection(database_user, database_password, database_name):
+    try:
+        con = mariadb.connect(user=database_user,
+                              password=database_password,
+                              database=database_name)
+    except mariadb.Error as e:
+        msg=f"Error connecting to database: {e}\n"
+        stop(msg)
+    con.autocommit = False
+    return con
+
+#-------------------------------------------------------------------------------
+
+def make_database_cursor(con):
+    return con.cursor()
+
+#-------------------------------------------------------------------------------
+
+class Database():
+
+    def __init__(self, cur, con):
+        self._cur = cur
+        self._con = con
+        self._tld_label_to_tld_id = {}
+        self.update()
+
+    def update(self):
+        self._tld_label_to_tld_id = {}
+        sql = f"SELECT tld.tld_label, tld.tld_id FROM tld;"
+        self._cur.execute(sql)
+        result_tuples = list(self._cur)
+        for result_tuple in result_tuples:
+            tld_label = result_tuple[0]
+            tld_id = result_tuple[1]
+            self._tld_label_to_tld_id[tld_label] = tld_id 
+
+    def has_tld_label(self, tld_label):
+        return tld_label in self._tld_label_to_tld_id 
+
+    def get_tld_id(self, tld_label):
+        return self._tld_label_to_tld_id[tld_label]
+
+    def add_tld_label(self, tld_label):
+        sql = f"INSERT INTO tld (tld.label) VALUES ('{tld_label}');"
+        self._cur.execute(sql)
+        self._con.commit()
+        self.update()
+
+    def ensure_tld_label(self, tld_label):
+        self.update()
+        if not self.has_tld_label(tld_label):
+            self.add_tld_label(tld_label)
+
+#-------------------------------------------------------------------------------
+
+class Sld():
+
+    def __init__(self, cur, con):
+        self._cur = cur
+        self._con = con
+
+    def ensure_sld_label(self, sld_label):
+        self.update()
+        if not self.has_tld_label(tld_label):
+            self.add_tld_label(tld_label)
+
+
+
+
+
+
+
+
+
+
+
+
+#-------------------------------------------------------------------------------
+
+def stop(msg):
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+    sys.exit(1)
+
+#-------------------------------------------------------------------------------
+
+def info(msg):
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+
+#-------------------------------------------------------------------------------
+
+def make_item_path_exist(item):
+    item_path = os.path.abspath(item)
+    if not os.path.isdir(item_path):
+        msg = f"Not a path: {item_path}\n"
+        stop(msg)
+    return item_path
+
+#-------------------------------------------------------------------------------
+
+def make_item_path_exist_empty(item):
+    item_path = os.path.abspath(item)
+    if not os.path.isdir(item_path):
+        msg = f"Not a path: {item_path}\n"
+        stop(msg)
+    if not os.listdir(item_path) == []:
+        msg = f"Not empty: {item_path}\n"
+        stop(msg)
+    return item_path
+
+#-------------------------------------------------------------------------------
+
+def make_item_path_file_exist(item):
+    item_path_file = os.path.abspath(item)
+    if not os.path.isfile(item_path_file):
+        msg = f"Not a path file: {item_path_file}\n"
+        stop(msg)
+    return item_path_file
+
+#-------------------------------------------------------------------------------
+
+def make_item_path_file_absent(item):
+    item_path_file = os.path.abspath(item)
+    if os.path.exists(item_path_file):
+        msg = f"Already exists: {item_path_file}\n"
+        stop(msg)
+    return item_path_file
+
+#-------------------------------------------------------------------------------
+
+def make_int_ge(item, limit):
+    if item < limit:
+        msg = f"Value: {item} must be greater than or equal to: {limit}\n"
+        stop(msg)
+    return item
+
+#-------------------------------------------------------------------------------
+
+def make_item_date_obj(item):
+    item_date_obj = None
+    try:
+        item_date_obj = datetime.date.fromisoformat(item)
+    except ValueError as e:
+        msg = f"Not YYYY-MM-DD date format: {item}\n"
+        stop(msg)
+    return item_date_obj
+
+#-------------------------------------------------------------------------------
+
+def ensure_valid_from_upto(from_date_obj, upto_date_obj):
+    if from_date_obj > upto_date_obj:
+        msg = ""
+        msg = msg + f"empty date range (as from is after upto) "
+        msg = msg + f"from: {from_date_obj.isoformat()} "
+        msg = msg + f"upto: {upto_date_obj.isoformat()}"
+        msg = msg + "\n"
+        stop(msg)
+
+#-------------------------------------------------------------------------------
+
+
+# Assumes:
+# from1_date_obj <= upto1_date_obj
+# from2_date_obj <= upto2_date_obj
+def range_overlap(from1_date_obj, upto1_date_obj, from2_date_obj, upto2_date_obj):
+    return ((from1_date_obj <= upto2_date_obj) and (upto1_date_obj >= from2_date_obj))
